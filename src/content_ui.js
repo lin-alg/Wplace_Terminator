@@ -38,7 +38,9 @@
       ruler_clear: "Clear",
       ruler_pick_toast: "Picked",
       ruler_wait_pick: "Click on the map to pick",
-      ruler_no_coords: "No coords available to pick"
+      ruler_no_coords: "No coords available to pick",
+      theme_default: "Default",
+      theme_halloween: "Halloween",
     },
     zh: {
       title: "Wplace 定位器",
@@ -73,7 +75,9 @@
       ruler_clear: "清除",
       ruler_pick_toast: "已拾取",
       ruler_wait_pick: "请在地图上点击以拾取",
-      ruler_no_coords: "没有可用的坐标"
+      ruler_no_coords: "没有可用的坐标",
+      theme_default: "默认",
+      theme_halloween: "万圣节"
     }
   };
 
@@ -214,6 +218,15 @@ langSel.addEventListener("change", () => {
     if (typeof window.__wplace_update_ruler_i18n === 'function') {
       window.__wplace_update_ruler_i18n();
     }
+  } catch (e) {}
+  try {
+  const themeSel = document.getElementById('wplace_theme_sel');
+  if (themeSel) {
+    for (const opt of Array.from(themeSel.options)) {
+      if (opt.value === 'custom-winter') opt.textContent = t('theme_default');
+      else if (opt.value === 'halloween') opt.textContent = t('theme_halloween');
+    }
+  }
   } catch (e) {}
 });
 
@@ -1187,17 +1200,17 @@ langSel.addEventListener("change", () => {
       sel.style.webkitAppearance = 'none';
       sel.style.appearance = 'none';
 
-      const options = [
-        { label: '默认', value: 'custom-winter' },
-        { label: '万圣节', value: 'halloween' }
-      ];
-      options.forEach(o => {
-        const opt = document.createElement('option');
-        opt.value = o.value;
-        opt.textContent = o.label;
-        try { opt.style.color = '#6e7376'; } catch(e){}
-        sel.appendChild(opt);
-      });
+    const options = [
+      { key: 'theme_default', value: 'custom-winter' },
+      { key: 'theme_halloween', value: 'halloween' }
+    ];
+    options.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = t(o.key);
+      try { opt.style.color = '#6e7376'; } catch(e){}
+      sel.appendChild(opt);
+    });
 
       wrapper.appendChild(sel);
       controls.appendChild(wrapper);
