@@ -40,7 +40,7 @@
       ruler_wait_pick: "Click on the map to pick",
       ruler_no_coords: "No coords available to pick",
       theme_default: "Default",
-      theme_halloween: "Halloween",
+      theme_dark: "Dark",
     },
     zh: {
       title: "Wplace 定位器",
@@ -77,7 +77,7 @@
       ruler_wait_pick: "请在地图上点击以拾取",
       ruler_no_coords: "没有可用的坐标",
       theme_default: "默认",
-      theme_halloween: "万圣节"
+      theme_dark: "深色"
     }
   };
 
@@ -224,7 +224,7 @@ langSel.addEventListener("change", () => {
   if (themeSel) {
     for (const opt of Array.from(themeSel.options)) {
       if (opt.value === 'custom-winter') opt.textContent = t('theme_default');
-      else if (opt.value === 'halloween') opt.textContent = t('theme_halloween');
+      else if (opt.value === 'custom-summer') opt.textContent = t('theme_dark');
     }
   }
   } catch (e) {}
@@ -1202,7 +1202,7 @@ langSel.addEventListener("change", () => {
 
     const options = [
       { key: 'theme_default', value: 'custom-winter' },
-      { key: 'theme_halloween', value: 'halloween' }
+      { key: 'theme_dark', value: 'custom-summer' }
     ];
     options.forEach(o => {
       const opt = document.createElement('option');
