@@ -41,6 +41,11 @@
       ruler_no_coords: "No coords available to pick",
       theme_default: "Default",
       theme_dark: "Dark",
+      check_updates: "Check updates",
+      checking_updates: "Checking...",
+      update_available: "New version available:",
+      up_to_date: "Up to date",
+      update_fail: "Update check failed"
     },
     zh: {
       title: "Wplace 定位器",
@@ -77,7 +82,12 @@
       ruler_wait_pick: "请在地图上点击以拾取",
       ruler_no_coords: "没有可用的坐标",
       theme_default: "默认",
-      theme_dark: "深色"
+      theme_dark: "深色",
+      check_updates: "检查更新",
+      checking_updates: "检查中…",
+      update_available: "发现新版本：",
+      up_to_date: "已是最新",
+      update_fail: "检查更新失败"
     }
   };
 
@@ -107,6 +117,7 @@
         <button id="wplace_fav_btn" title="${t("fav_add")}" class="wplace_btn star">${t("fav_add")}</button>
         <button id="wplace_fav_manager_btn" class="wplace_btn">${t("fav_manager")}</button>
         <button id="wplace_ruler_btn" class="wplace_btn">${t("ruler")}</button>
+        <button id="wplace_check_update" class="wplace_btn">⇪</button>
       </div>
       <input id="wplace_input" type="text" placeholder="${t("placeholder")}" />
     </div>
@@ -136,7 +147,453 @@
   const favBtn = root.querySelector("#wplace_fav_btn");
   const favManagerBtn = root.querySelector("#wplace_fav_manager_btn");
   const rulerBtn = root.querySelector("#wplace_ruler_btn");
+  const checkUpdateBtn = root.querySelector('#wplace_check_update');
 
+  try {
+    if (checkUpdateBtn) {
+      checkUpdateBtn.textContent = '⇪';
+      checkUpdateBtn.style.fontSize = '18px';
+      checkUpdateBtn.style.lineHeight = '1';
+      checkUpdateBtn.style.padding = '6px 8px';
+      checkUpdateBtn.title = t('check_updates');
+      checkUpdateBtn.setAttribute('aria-label', t('check_updates'));
+    }
+  } catch(e){}
+
+// 小的 toast 包装（优先使用 showToast）
+function showMainToast(msg, timeout=2500) {
+  try { showToast(msg, timeout); } catch (e) {
+    try {
+      if (toast) {
+        toast.style.display = 'block';
+        toast.textContent = msg;
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(()=>{ toast.style.display='none'; }, timeout);
+      } else { console.log(msg); }
+    } catch(_) { console.log(msg); }
+  }
+}
+
+// 尝试读取本地版本
+async function getLocalVersionMain() {
+  try {
+    // 1) Preferred: chrome.runtime.getManifest (synchronous, available in extensions)
+    try {
+      if (window.chrome && chrome.runtime && typeof chrome.runtime.getManifest === 'function') {
+        const manifest = chrome.runtime.getManifest();
+        if (manifest && manifest.version) return String(manifest.version);
+      }
+    } catch (e) {}
+
+    // 2) Fallback: manifest.json via chrome.runtime.getURL + fetch
+    try {
+      if (window.chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+        const url = chrome.runtime.getURL('manifest.json');
+        const r = await fetch(url, { cache: 'no-store' }).catch(()=>null);
+        if (r && r.ok) {
+          const j = await r.json().catch(()=>null);
+          if (j && j.version) return String(j.version);
+        }
+      }
+    } catch (e) {}
+
+    // 3) Fallback: any bundled meta file (wplace_meta.json)
+    try {
+      if (window.chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+        const url2 = chrome.runtime.getURL('wplace_meta.json');
+        const r2 = await fetch(url2, { cache: 'no-store' }).catch(()=>null);
+        if (r2 && r2.ok) {
+          const j2 = await r2.json().catch(()=>null);
+          if (j2 && j2.version) return String(j2.version);
+        }
+      }
+    } catch (e) {}
+
+    // 4) Fallback: localStorage / window variables (compat with existing code)
+    try {
+      const raw = localStorage.getItem('wplace_local_meta') || localStorage.getItem('wplace_local_version') || localStorage.getItem('wplace_version');
+      if (raw) {
+        try {
+          const p = JSON.parse(raw);
+          if (p && p.version) return String(p.version);
+        } catch (e) {
+          return String(raw);
+        }
+      }
+    } catch (e) {}
+
+    try {
+      if (window.__wplace_local_version) return String(window.__wplace_local_version);
+      if (window.__wplace_meta && window.__wplace_meta.version) return String(window.__wplace_meta.version);
+    } catch (e) {}
+
+  } catch (e) {
+    // swallow and return null at end
+  }
+  return null;
+}
+
+// semver-like compare: returns -1 if a<b, 0 if equal, 1 if a>b, null if cannot compare
+function compareVersionsMain(a, b) {
+  // normalize: remove BOM/zero-width, trim, extract tag from GH URL, remove leading v/V
+  function normalizeRaw(v) {
+    if (v === null || typeof v === 'undefined') return null;
+    try {
+      let s = String(v);
+      s = s.replace(/[\u200B-\u200F\uFEFF]/g, ''); // strip invisible chars
+      s = s.trim();
+      // if input is a GH release URL containing /tag/, extract the tag part
+      try {
+        if (/\/tag\//i.test(s)) {
+          const m = s.match(/\/tag\/([^\/\?#]+)/i);
+          if (m && m[1]) s = decodeURIComponent(m[1]);
+        }
+      } catch (e) {}
+      // remove leading v or V and optional whitespace
+      s = s.replace(/^[vV]\s*/, '');
+      // final trim
+      s = s.trim();
+      return s.length ? s : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // split main numeric dotted part and suffix
+  function splitMainAndSuffix(s) {
+    const m = String(s).match(/^([0-9]+(?:\.[0-9]+)*)(.*)$/);
+    if (m) return { main: m[1], suffix: (m[2] || '') };
+    return { main: '0', suffix: s };
+  }
+
+  // tokenize suffix into segments for comparison
+  function tokenizeSuffix(s) {
+    return s.replace(/^[\.\-\+_]+/, '').split(/[\.\-\+_]+/).filter(Boolean);
+  }
+
+  const na = normalizeRaw(a);
+  const nb = normalizeRaw(b);
+  if (!na || !nb) return null;
+
+  // If exactly identical strings after normalization, short-circuit to equal
+  if (na === nb) return 0;
+
+  const A = splitMainAndSuffix(na);
+  const B = splitMainAndSuffix(nb);
+
+  const partsA = A.main.split('.').map(x => (x === '' ? 0 : Number(x)));
+  const partsB = B.main.split('.').map(x => (x === '' ? 0 : Number(x)));
+  const len = Math.max(partsA.length, partsB.length);
+
+  for (let i = 0; i < len; i++) {
+    const va = (i < partsA.length && Number.isFinite(partsA[i])) ? partsA[i] : 0;
+    const vb = (i < partsB.length && Number.isFinite(partsB[i])) ? partsB[i] : 0;
+    if (va < vb) return -1;
+    if (va > vb) return 1;
+  }
+
+  // numeric main equal -> suffix handling (stable > pre-release)
+  const sa = (A.suffix || '').trim();
+  const sb = (B.suffix || '').trim();
+  if (!sa && !sb) return 0;
+  if (!sa && sb) return 1;
+  if (sa && !sb) return -1;
+
+  const ta = tokenizeSuffix(sa);
+  const tb = tokenizeSuffix(sb);
+  const tlen = Math.max(ta.length, tb.length);
+  for (let i = 0; i < tlen; i++) {
+    const xa = i < ta.length ? ta[i] : '';
+    const xb = i < tb.length ? tb[i] : '';
+    const naNum = (xa !== '' && !isNaN(Number(xa))) ? Number(xa) : null;
+    const nbNum = (xb !== '' && !isNaN(Number(xb))) ? Number(xb) : null;
+
+    if (naNum !== null && nbNum !== null) {
+      if (naNum < nbNum) return -1;
+      if (naNum > nbNum) return 1;
+    } else if (naNum !== null && nbNum === null) {
+      return -1;
+    } else if (naNum === null && nbNum !== null) {
+      return 1;
+    } else {
+      const ca = String(xa);
+      const cb = String(xb);
+      if (ca < cb) return -1;
+      if (ca > cb) return 1;
+    }
+  }
+
+  return 0;
+}
+
+async function initLocalVersionFromManifest() {
+  try {
+    // try to read already-known values first
+    let existing = null;
+    try { existing = localStorage.getItem('wplace_local_version') || localStorage.getItem('wplace_local_meta'); } catch(e){ existing = null; }
+    if (existing) return; // already initialized
+
+    // try manifest.json via chrome.runtime.getURL if available
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.getURL) {
+        const url = chrome.runtime.getURL('manifest.json');
+        const resp = await fetch(url, { cache: 'no-store' }).catch(()=>null);
+        if (resp && resp.ok) {
+          const j = await resp.json().catch(()=>null);
+          if (j && j.version) {
+            try { localStorage.setItem('wplace_local_version', String(j.version)); } catch(e){}
+            try { window.__wplace_local_version = String(j.version); } catch(e){}
+            return;
+          }
+        }
+      }
+    } catch(e){}
+
+    // fallback: try wplace_meta.json (if you bundle one)
+    try {
+      if (chrome && chrome.runtime && chrome.runtime.getURL) {
+        const url2 = chrome.runtime.getURL('wplace_meta.json');
+        const r2 = await fetch(url2, { cache: 'no-store' }).catch(()=>null);
+        if (r2 && r2.ok) {
+          const m2 = await r2.json().catch(()=>null);
+          if (m2 && m2.version) {
+            try { localStorage.setItem('wplace_local_version', String(m2.version)); } catch(e){}
+            try { window.__wplace_local_version = String(m2.version); } catch(e){}
+            return;
+          }
+        }
+      }
+    } catch(e){}
+
+    // final fallback: read manifest via relative URL (rare in MV3 but harmless)
+    try {
+      const r3 = await fetch('/manifest.json', { cache: 'no-store' }).catch(()=>null);
+      if (r3 && r3.ok) {
+        const j3 = await r3.json().catch(()=>null);
+        if (j3 && j3.version) {
+          try { localStorage.setItem('wplace_local_version', String(j3.version)); } catch(e){}
+          try { window.__wplace_local_version = String(j3.version); } catch(e){}
+          return;
+        }
+      }
+    } catch(e){}
+  } catch (err) {
+    // silent fail — initialization best-effort only
+    try { console.debug('initLocalVersionFromManifest failed', err); } catch(_) {}
+  }
+}
+
+// call it once (no await required to avoid blocking UI)
+async function ensureLocalVersionIsSet() {
+  try {
+    // 如果已有值则不覆盖
+    try {
+      const existing = localStorage.getItem('wplace_local_version') || localStorage.getItem('wplace_local_meta') || (window.__wplace_local_version || null);
+      if (existing && String(existing).trim().length) return;
+    } catch(e) {}
+
+    // 1) 尝试通过 chrome.runtime.getURL 读取 manifest.json
+    try {
+      if (window.chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+        const url = chrome.runtime.getURL('manifest.json');
+        const r = await fetch(url, { cache: 'no-store' }).catch(()=>null);
+        if (r && r.ok) {
+          const j = await r.json().catch(()=>null);
+          if (j && j.version) {
+            const v = String(j.version).trim();
+            try { localStorage.setItem('wplace_local_version', v); } catch(_) {}
+            try { window.__wplace_local_version = v; } catch(_) {}
+            try { if (chrome && chrome.storage && chrome.storage.local) chrome.storage.local.set({ wplace_local_version: v }); } catch(_) {}
+            return;
+          }
+        }
+      }
+    } catch(e){}
+
+    // 2) 回退到扩展打包的自定义 meta 文件（如果有）
+    try {
+      if (window.chrome && chrome.runtime && typeof chrome.runtime.getURL === 'function') {
+        const url2 = chrome.runtime.getURL('wplace_meta.json');
+        const r2 = await fetch(url2, { cache: 'no-store' }).catch(()=>null);
+        if (r2 && r2.ok) {
+          const m2 = await r2.json().catch(()=>null);
+          if (m2 && m2.version) {
+            const v2 = String(m2.version).trim();
+            try { localStorage.setItem('wplace_local_version', v2); } catch(_) {}
+            try { window.__wplace_local_version = v2; } catch(_) {}
+            try { if (chrome && chrome.storage && chrome.storage.local) chrome.storage.local.set({ wplace_local_version: v2 }); } catch(_) {}
+            return;
+          }
+        }
+      }
+    } catch(e){}
+
+    // 3) 开发/页面相对路径兜底（在某些调试场景有用）
+    try {
+      const r3 = await fetch('/manifest.json', { cache: 'no-store' }).catch(()=>null);
+      if (r3 && r3.ok) {
+        const j3 = await r3.json().catch(()=>null);
+        if (j3 && j3.version) {
+          const v3 = String(j3.version).trim();
+          try { localStorage.setItem('wplace_local_version', v3); } catch(_) {}
+          try { window.__wplace_local_version = v3; } catch(_) {}
+          try { if (chrome && chrome.storage && chrome.storage.local) chrome.storage.local.set({ wplace_local_version: v3 }); } catch(_) {}
+          return;
+        }
+      }
+    } catch(e){}
+
+    // 4) 若所有外部读取都失败，且 manifest/version 无法拿到，可尝试从已有 local keys 中解析并写入标准 key
+    try {
+      const candidates = [
+        localStorage.getItem('wplace_local_meta'),
+        localStorage.getItem('wplace_meta'),
+        localStorage.getItem('wplace_version'),
+        localStorage.getItem('wplace_local_version')
+      ];
+      for (const c of candidates) {
+        if (!c) continue;
+        try {
+          const p = JSON.parse(c);
+          if (p && p.version) {
+            const v4 = String(p.version).trim();
+            try { localStorage.setItem('wplace_local_version', v4); } catch(_) {}
+            try { window.__wplace_local_version = v4; } catch(_) {}
+            try { if (chrome && chrome.storage && chrome.storage.local) chrome.storage.local.set({ wplace_local_version: v4 }); } catch(_) {}
+            return;
+          }
+        } catch(_) {
+          // 如果不是 JSON，直接认为它就是版本字符串
+          const s = String(c).trim();
+          if (s.length) {
+            try { localStorage.setItem('wplace_local_version', s); } catch(_) {}
+            try { window.__wplace_local_version = s; } catch(_) {}
+            try { if (chrome && chrome.storage && chrome.storage.local) chrome.storage.local.set({ wplace_local_version: s }); } catch(_) {}
+            return;
+          }
+        }
+      }
+    } catch(e){}
+
+  } catch (err) {
+    try { console.debug('ensureLocalVersionIsSet failed', err); } catch(_) {}
+  }
+}
+
+// 立即执行一次（不阻塞主流程）
+try { ensureLocalVersionIsSet(); } catch(e) {}
+
+
+// fetch latest release from GitHub
+async function fetchLatestReleaseMain() {
+  try {
+    const api = 'https://api.github.com/repos/lin-alg/Wplace_Locator/releases/latest';
+    const r = await fetch(api, { cache: 'no-store' });
+    if (!r || !r.ok) throw new Error('gh fetch failed');
+    const j = await r.json();
+    return j;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 主检查更新函数（被按钮调用）
+async function checkForUpdatesMain() {
+  if (!checkUpdateBtn) return;
+
+  function extractTagFromGH(gh) {
+    if (!gh) return null;
+    if (gh.tag_name && String(gh.tag_name).trim().length) return String(gh.tag_name);
+    if (gh.name && String(gh.name).trim().length) return String(gh.name);
+    const u = gh.html_url || gh.url || '';
+    if (u && typeof u === 'string') {
+      try {
+        const m = u.match(/\/tag\/([^\/\?#]+)/i);
+        if (m && m[1]) return decodeURIComponent(m[1]);
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  function normalizeForDisplay(v) {
+    if (v === null || typeof v === 'undefined') return null;
+    try {
+      return String(v).replace(/[\u200B-\u200F\uFEFF]/g, '').trim();
+    } catch (e) { return String(v); }
+  }
+
+  try {
+    checkUpdateBtn.disabled = true;
+    const prev = checkUpdateBtn.textContent;
+    try { checkUpdateBtn.textContent = t('checking_updates'); } catch (e) {}
+    showMainToast(t('checking_updates'));
+
+    const [localRaw, gh] = await Promise.all([getLocalVersionMain(), fetchLatestReleaseMain().catch(()=>null)]);
+    const remoteRaw = extractTagFromGH(gh); // e.g. "v2.0" or "2.0" or null
+
+    const localNorm = localRaw ? localRaw.toString().replace(/^[\u200B-\u200F\uFEFF]+/, '').trim().replace(/^[vV]\s*/, '') : null;
+    const remoteNorm = remoteRaw ? remoteRaw.toString().replace(/^[\u200B-\u200F\uFEFF]+/, '').trim().replace(/^[vV]\s*/, '') : null;
+
+    // If both normalized values exist and are exactly equal -> show up-to-date
+    if (localNorm && remoteNorm && localNorm === remoteNorm) {
+      showMainToast(`${t('up_to_date')}: ${normalizeForDisplay(localNorm)}`);
+      try { checkUpdateBtn.textContent = prev; checkUpdateBtn.disabled = false; } catch(e){}
+      return;
+    }
+
+    // proceed to compare using robust comparator
+    if (!localNorm && !remoteNorm) {
+      showMainToast(t('update_fail'));
+      try { checkUpdateBtn.textContent = prev; checkUpdateBtn.disabled = false; } catch(e){}
+      return;
+    }
+
+    if (!remoteNorm && localNorm) {
+      showMainToast(`${t('up_to_date')}: ${normalizeForDisplay(localNorm)}`);
+      try { checkUpdateBtn.textContent = prev; checkUpdateBtn.disabled = false; } catch(e){}
+      return;
+    }
+
+    if (!localNorm && remoteNorm) {
+      const msg = `${t('update_available')} ${normalizeForDisplay(remoteRaw || remoteNorm)}`;
+      showMainToast(msg, 6000);
+      if (confirm(`${msg}\n\n${gh && gh.html_url ? gh.html_url : 'https://github.com/lin-alg/Wplace_Locator/releases'}\n\nOpen release page?`)) {
+        try { window.open((gh && gh.html_url) || 'https://github.com/lin-alg/Wplace_Locator/releases', '_blank'); } catch(_) {}
+      }
+      try { checkUpdateBtn.textContent = prev; checkUpdateBtn.disabled = false; } catch(e){}
+      return;
+    }
+
+    const cmp = compareVersionsMain(localNorm, remoteNorm);
+    if (cmp === null) {
+      showMainToast(t('update_fail'));
+    } else if (cmp < 0) {
+      const msg = `${t('update_available')} ${normalizeForDisplay(remoteRaw || remoteNorm)}`;
+      showMainToast(msg, 6000);
+      if (confirm(`${msg}\n\n${gh && gh.html_url ? gh.html_url : 'https://github.com/lin-alg/Wplace_Locator/releases'}\n\nOpen release page?`)) {
+        try { window.open((gh && gh.html_url) || 'https://github.com/lin-alg/Wplace_Locator/releases', '_blank'); } catch(_) {}
+      }
+    } else {
+      showMainToast(`${t('up_to_date')}: ${normalizeForDisplay(localRaw || localNorm)}`);
+    }
+
+    try { checkUpdateBtn.textContent = prev; checkUpdateBtn.disabled = false; } catch(e){}
+  } catch (e) {
+    console.error('checkForUpdatesMain error', e);
+    try { showMainToast(t('update_fail')); } catch(_) {}
+    try { checkUpdateBtn.textContent = t('check_updates'); checkUpdateBtn.disabled = false; } catch(_) {}
+  }
+}
+
+
+// 绑定点击事件
+try {
+  if (checkUpdateBtn) {
+    checkUpdateBtn.addEventListener('click', (ev) => {
+      try { checkForUpdatesMain(); } catch(e) {}
+    });
+  }
+} catch(e){}
   langSel.value = lang;
 // 更全面且稳健的语言切换处理器（替换原有的 change handler）
 langSel.addEventListener("change", () => {
@@ -2184,10 +2641,8 @@ document.addEventListener('click', (ev) => {
       return false;
     }
 
-    if (pathHasMapElement(path) || pathHasMapElementFallback(path)) {
-      setTimeout(() => {
-        try { requestFetchAndFill(); } catch(e){}
-      }, 700);
+    if (pathHasMapElementFallback(path)) {
+      setTimeout(() => { try { requestFetchAndFill(); } catch(e){} }, 700);
     }
   } catch (e) {
     // ignore
