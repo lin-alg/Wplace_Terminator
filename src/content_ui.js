@@ -4247,7 +4247,7 @@ try { installShareAndFavHandlers(); } catch (e) { console.warn('installShareAndF
 
   /* Right-button long-press acts like pressing Q (with smoother tuning) */
   (function installRightHoldAsQ() {
-    const HOLD_MS = Number(state.cfg.rightHoldMs || 500);
+    const HOLD_MS = Number(state.cfg.rightHoldMs);
     const MOVE_THRESHOLD = Number(state.cfg.rightHoldMoveThreshold || 10);
     let rightState = { pressed: false, timer: null, active: false, startX: 0, startY: 0, moved: false, suppressHandler: null };
 
@@ -4434,4 +4434,241 @@ try {
     navigator.serviceWorker.getRegistrations().then(()=>{}).catch(()=>{});
   }
 } catch (e){}
+})();
+// 隐藏blue marble或是skirk marble
+(function installZToggleForBmDashDash() {
+  try {
+    if (window.__wplace_z_bm_dashdash_installed) return;
+    window.__wplace_z_bm_dashdash_installed = true;
+
+    let state = {
+      isHidden: false,
+      originalNode: null,
+      parent: null,
+      nextSibling: null,
+      oldInlineStyle: null,
+      oldAriaHidden: null,
+      dataMarked: false,
+      cloneFallback: null
+    };
+
+    function findBmCandidate() {
+      try {
+        // 1) 精确优先匹配你提到的 id（bm-- -> bm-A -> bm-z）
+        const preferIds = ['bm--', 'bm-A', 'bm-A'.toLowerCase()]; // bm-A is case-sensitive in DOM; we will try exact and then fallbacks
+        for (const id of ['bm--', 'bm-A', 'bm-a']) {
+          try {
+            const el = document.getElementById(id);
+            if (el) return el;
+          } catch (e) {}
+        }
+
+        // 2) 如果存在 bm-z（内部控件），向上寻找最近包含 bm- 前缀的祖先容器
+        const elBmZ = document.getElementById('bm-z');
+        if (elBmZ) {
+          let node = elBmZ;
+          while (node && node !== document.body) {
+            if (node.id && /^bm[-_]/i.test(node.id)) return node;
+            if (node.className && typeof node.className === 'string' && /(^|\s)bm(-|_)?/i.test(node.className)) return node;
+            node = node.parentElement;
+          }
+          return elBmZ;
+        }
+      } catch (e) {}
+
+      try {
+        // 3) 回退：寻找 id 以 bm- 开头且 DOM 结构看起来像面板（含输入、按钮或图片）
+        const bmPref = Array.from(document.querySelectorAll('[id]')).find(el => {
+          try {
+            if (!el.id) return false;
+            if (!/^bm[-_]/i.test(el.id)) return false;
+            // 简单检查：包含输入、按钮或图片之一
+            return !!(el.querySelector && (el.querySelector('input, button, img, textarea') || el.querySelector('[id^="bm-"]')));
+          } catch (e) { return false; }
+        });
+        if (bmPref) return bmPref;
+      } catch (e) {}
+
+      try {
+        // 4) 最后回退：查找包含明显文本或图片特征的容器
+        const nodes = Array.from(document.querySelectorAll('div')).slice(0, 800);
+        for (const n of nodes) {
+          try {
+            const text = (n.innerText || '').toLowerCase();
+            if (text.includes('skirk marble') || text.includes('blue marble')) return n;
+            if (n.querySelector && n.querySelector('img[alt*="Blue Marble"], img[alt*="Skirk"], img[alt*="Blue Marble Icon"]')) return n;
+          } catch (e) {}
+        }
+      } catch (e) {}
+
+      return null;
+    }
+
+    function preserve(node) {
+      try {
+        state.originalNode = node;
+        state.parent = node.parentElement || null;
+        state.nextSibling = node.nextSibling || null;
+        state.oldInlineStyle = node.getAttribute && node.getAttribute('style');
+        state.oldAriaHidden = node.getAttribute && node.getAttribute('aria-hidden');
+        state.dataMarked = !!(node.getAttribute && node.getAttribute('data-wplace-hidden-bm'));
+        try { state.cloneFallback = node.cloneNode(true); } catch (e) { state.cloneFallback = null; }
+      } catch (e) {
+        state.originalNode = node;
+      }
+    }
+
+    function clearState() {
+      state.originalNode = null;
+      state.parent = null;
+      state.nextSibling = null;
+      state.oldInlineStyle = null;
+      state.oldAriaHidden = null;
+      state.dataMarked = false;
+      state.cloneFallback = null;
+      state.isHidden = false;
+    }
+
+    function doHide(node) {
+      if (!node) return false;
+      preserve(node);
+      try { node.setAttribute && node.setAttribute('data-wplace-hidden-bm', '1'); } catch (e) {}
+      try { node.setAttribute && node.setAttribute('aria-hidden', 'true'); } catch (e) {}
+      try { node.setAttribute && node.setAttribute('data-wplace-old-style', node.getAttribute('style') || ''); } catch (e) {}
+
+      try {
+        // 使 top/right 生效：若 computed position 为 static 则设置 position:fixed
+        const comp = window.getComputedStyle(node);
+        if (!node.style.position && (!comp || comp.position === 'static' || comp.position === '')) {
+          node.style.position = 'fixed';
+        }
+        // 设置目标坐标并彻底隐藏
+        node.style.top = '-100px';
+        node.style.right = '75px';
+        node.style.transition = 'opacity 120ms linear';
+        node.style.opacity = '0';
+        node.style.pointerEvents = 'none';
+        node.style.display = 'none';
+      } catch (e) {}
+
+      state.isHidden = true;
+      return true;
+    }
+
+    function insertNodeAtParent(nodeToInsert) {
+      try {
+        if (!state.parent) {
+          document.body.appendChild(nodeToInsert);
+          return true;
+        }
+        if (state.nextSibling && state.parent.contains(state.nextSibling)) {
+          state.parent.insertBefore(nodeToInsert, state.nextSibling);
+        } else {
+          state.parent.appendChild(nodeToInsert);
+        }
+        return true;
+      } catch (e) {
+        try { state.parent.appendChild(nodeToInsert); return true; } catch (e2) { return false; }
+      }
+    }
+
+    function doRestore() {
+      try {
+        // 优先恢复原始节点（如果仍在 DOM 中）
+        if (state.originalNode && document.body.contains(state.originalNode)) {
+          const n = state.originalNode;
+          const oldStyle = n.getAttribute && n.getAttribute('data-wplace-old-style');
+          if (typeof oldStyle !== 'undefined' && oldStyle !== null) {
+            if (oldStyle.length) n.setAttribute('style', oldStyle);
+            else n.removeAttribute && n.removeAttribute('style');
+            try { n.removeAttribute('data-wplace-old-style'); } catch (e) {}
+          } else if (state.oldInlineStyle) {
+            n.setAttribute('style', state.oldInlineStyle || '');
+          } else {
+            n.removeAttribute && n.removeAttribute('style');
+          }
+          if (typeof state.oldAriaHidden === 'undefined' || state.oldAriaHidden === null) n.removeAttribute && n.removeAttribute('aria-hidden');
+          else n.setAttribute && n.setAttribute('aria-hidden', state.oldAriaHidden);
+          if (!state.dataMarked) n.removeAttribute && n.removeAttribute('data-wplace-hidden-bm');
+          try { n.style.display = ''; n.style.opacity = ''; n.style.pointerEvents = ''; } catch (e) {}
+          clearState();
+          showToast && showToast('已恢复 bm 面板');
+          return true;
+        }
+
+        // 原始节点不在 DOM，尝试用 cloneFallback 恢复
+        if (state.cloneFallback) {
+          let newNode;
+          try { newNode = state.cloneFallback.cloneNode(true); } catch (e) { try { newNode = state.cloneFallback; } catch (e2) { newNode = null; } }
+          if (newNode) {
+            const ok = insertNodeAtParent(newNode);
+            if (ok) {
+              newNode.removeAttribute && newNode.removeAttribute('data-wplace-hidden-bm');
+              newNode.removeAttribute && newNode.removeAttribute('aria-hidden');
+              try { newNode.style.display = ''; newNode.style.opacity = ''; newNode.style.pointerEvents = ''; } catch (e) {}
+              state.originalNode = newNode;
+              clearState();
+              showToast && showToast('已用备份恢复（原始元素被移除）');
+              return true;
+            }
+          }
+        }
+
+        clearState();
+        showToast && showToast('无法恢复 bm 面板（原始节点丢失）');
+        return false;
+      } catch (e) {
+        clearState();
+        showToast && showToast('恢复失败');
+        return false;
+      }
+    }
+
+    function toggle() {
+      try {
+        if (state.isHidden) {
+          doRestore();
+          return;
+        }
+        const cand = findBmCandidate();
+        if (!cand) {
+          showToast && showToast('未找到 bm 面板');
+          return;
+        }
+        doHide(cand);
+        showToast && showToast('已隐藏 bm 面板，按 Z 可复原');
+      } catch (e) {}
+    }
+
+    function onKeyDown(e) {
+      try {
+        if (e && e.repeat) return;
+        const active = document.activeElement;
+        const tag = (active && active.tagName || '').toLowerCase();
+        if (active && (active.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select')) return;
+        if (e.key === 'z' || e.key === 'Z') {
+          e.preventDefault && e.preventDefault();
+          e.stopPropagation && e.stopPropagation();
+          toggle();
+        }
+      } catch (e) {}
+    }
+
+    window.addEventListener('keydown', onKeyDown, true);
+
+    window.__wplace_z_bm_dashdash = {
+      toggle: toggle,
+      hide: function() { const c = findBmCandidate(); return c ? doHide(c) : false; },
+      restore: doRestore,
+      find: findBmCandidate,
+      status: function() { return { isHidden: !!state.isHidden, hasOriginal: !!state.originalNode, parent: state.parent || null }; },
+      uninstall: function() {
+        try { window.removeEventListener('keydown', onKeyDown, true); } catch (e) {}
+        window.__wplace_z_bm_dashdash_installed = false;
+      }
+    };
+
+  } catch (e) {
+    console.warn('installZToggleForBmDashDash failed', e);
+  }
 })();
