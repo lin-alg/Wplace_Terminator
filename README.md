@@ -1,6 +1,6 @@
-# Wplace_Locator
+# Wplace_Versatile_Tool
 
-(此扩展如此有用，以至于值得花很少的时间安装.如果您愿意贡献篡改猴版本，我将万分感谢)
+(此扩展如此有用，以至于值得您独立安装它。如果您愿意贡献篡改猴版本，我将万分感谢)
 (This extension is so useful that it's worth the time to install it. and I would be extremely grateful if you were willing to contribute a tamper monkey version.)
 
 选择语言 / Choose language  
@@ -26,56 +26,52 @@
 ---
 
 ### 概览
-Wplace_Locator 是一个轻量的悬浮扩展。它可以：
-- 一键复制并分享页面上的像素坐标（四元坐标：TlX, TlY, PxX, PxY）；
-- 把四元坐标转换成经纬并打开 wplace.live 定位；
-- 在支持的页面上自动检测绘图插件并填入坐标输入框，省去手工输入。
-
+Wplace多功能工具 是一个轻量的悬浮式扩展。它可以：
+- 分享坐标：一键分享基准坐标和位置信息
+- 跳转：粘贴别人分享的坐标，立刻跳转到对应位置并自动向绘画插件填入基准坐标
+- 收藏历史坐标
+- 标尺：测量一幅画的总像素量或是长宽，不用再人工估计
+- 地图样式：可以关闭地名和道路显示，使地图更清爽
+- 快捷键：用键盘就可以放缩地图大小；新增可以显示/隐藏绘图插件的快捷键，绘图时更专心
+- 自动检查更新功能
 ---
 
 ### 适合谁用
 - 想快速在 wplace.live 或类似地图上定位某个瓦片的用户；  
 - 与朋友协作共享地图视角时需要精确坐标的场景；  
-- 不想手动寻找并输入基准坐标的用户。
-
----
-
-### 主要功能
-- 悬浮面板：可拖拽、最小化为图标并记住位置。  
-- 分享/复制：一键复制最近的四元坐标到剪贴板（带兼容回退）。  
-- 跳转地图：将四元坐标转为高精度经纬并打开 wplace.live 指定位置。  
-- 自动填表：智能检测页面表单并尝试把坐标填入（Blue / Skirk 等常见格式）。  
-- 主题切换：在支持的页面上安全切换主题设置（兼顾页面安全策略）。
+- 不想手动寻找并输入基准坐标的用户；
+- 想提高绘画生产力的用户。
 
 ---
 
 ### 快速开始
 
-#### 安装（开发 / 调试）
-安装下面的解压版插件：
-1. 下载src文件夹至本地。
+#### 安装
+1. 下载最新的release到本地。（以v2.3版本为例）
+![alt text](./images/image-6.png)
+![alt text](./images/image-7.png)
 2. 打开 Chrome或Edge 扩展管理页（chrome://extensions/ 或 edge://extensions/），打开“开发者模式”。  
+- 谷歌：
 ![alt text](./images/image-1.png)
+- Edge: 
+![alt text](./images/image-8.png)
 3. 点击“加载已解压的扩展”，选择本项目的 src 文件夹。 
 ![alt text](./images/image.png) 
 4. 打开或刷新 Wplace 网站。
 
-#### 快速使用步骤
-1. 页面右下角或页面上出现悬浮图标，点击打开面板。 
+#### 使用步骤
+1. 页面右下角会出现一个悬浮图标，单击即可打开面板。 
 ![alt text](./images/image-2.png) 
-2. 单击页面位置，然后点击“分享”。会把最近的四元坐标复制到剪贴板。
-![alt text](./images/image-3.png)  
-3. 在面板输入框粘贴四元坐标，用逗号隔开（示例：`180,137,42,699`），点击“跳转”即可。  
-![alt text](./images/image-4.png)
-4. 扩展会尝试自动把基准坐标填入绘画插件。（Skirk Marble也适用）
-![alt text](./images/image-5.png)
-5. 点击最小化按钮可以把面板缩为图标，再点击图标可恢复。
-
+2. 页面上有各种功能的按钮，鼠标移动到上面即可显示对应功能。
+![alt text](./images/image-3.png) 
+3. W键控制绘画插件（blue marble或者是skirk marble）的显示，S键控制本插件面板的显示，A和D分别是放大和缩小。长按鼠标右键可以缩小。    
+在地图视野过宽的情况下，点击地图任意位置即可自动放大到那个区域，再也不会出现“请放大以选择像素”的烦人弹窗。
+![alt text](./images/image-10.png) 
 ---
 
 ### 隐私与安全
 - 本扩展仅在本地读取/写入需要的坐标与主题设置，不会把坐标上传到外部服务器。  
-- 如果关心隐私或想查看实现，请检查扩展源码或直接卸载扩展。
+- 如果关心隐私或想查看实现，请检查扩展源码
 
 ---
 
@@ -84,10 +80,10 @@ Wplace_Locator 是一个轻量的悬浮扩展。它可以：
 
 ---
 
-### 附录：小提示
-- 如果主题无法保持，请在 DevTools 的 Network / Elements 中确认扩展注入点是否加载成功（适用于调试）。  
-- 若自动填表失败，试着刷新目标页或等待页面完成加载后再尝试 Jump。  
-- 在开发或调试时可临时打开控制台查看扩展输出日志，帮助定位问题。
+### 常见问题
+- 如果无法切换主题或地图样式，请把后面的参数（?_wplace_reload=……）去掉，重新进入网站即可生效。
+![alt text](./images/image-11.png) 
+推荐移除道路显示，地名显示根据个人喜好决定。一旦选定好地图样式和主题，最好不要频繁切换，以免切换失败。
 
 ---
 
@@ -108,7 +104,7 @@ Wplace_Locator 是一个轻量的悬浮扩展。它可以：
 ---
 
 ### Overview
-Wplace_Locator is a light floating browser extension that helps you:
+Wplace_Versatile_Tool is a light floating browser extension that helps you:
 - Copy and share pixel coordinates (four-values: TlX, TlY, PxX, PxY);  
 - Convert those four-values into latitude/longitude and open the location on wplace.live;  
 - Auto-fill coordinate inputs on supported pages to save manual work.
