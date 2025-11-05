@@ -1,5 +1,5 @@
 /* content_ui.css */
-#wplace_locator {
+#wplace_versatile_tool {
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -13,7 +13,7 @@
   font-family: Arial, sans-serif;
   padding: 12px;
 }
-#wplace_locator.minimized {
+#wplace_versatile_tool.minimized {
   width: 56px;
   height: 56px;
   border-radius: 50%;

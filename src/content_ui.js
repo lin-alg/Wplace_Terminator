@@ -1,12 +1,12 @@
 // content_ui.js (完整替换文件)
 // 功能：浮动面板、稳定拖拽、最小化为可拖拽图标、智能检测并填充 Blue/Skirk 输入后跳转
 (() => {
-  if (window.__WPLACE_LOCATOR_INJECTED) return;
-  window.__WPLACE_LOCATOR_INJECTED = true;
+  if (window.__WPLACE_VERSATILE_TOOL_INJECTED) return;
+  window.__WPLACE_VERSATILE_TOOL_INJECTED = true;
 
   const i18n = {
     en: {
-      title: "Wplace Locator",
+      title: "Wplace Versatile Tool",
       share: "Share",
       jump: "Jump",
       placeholder: "Enter TlX, TlY, PxX, PxY (e.g. 180,137,42,699)",
@@ -51,7 +51,7 @@
       save_and_refresh: "Save and refresh"
     },
     zh: {
-      title: "Wplace 定位器",
+      title: "Wplace 多功能工具",
       share: "分享",
       jump: "跳转",
       placeholder: "输入 TlX, TlY, PxX, PxY，例如 180,137,42,699",
@@ -102,7 +102,7 @@
 
   // ---------- Create root UI (no map-style select) ----------
   const root = document.createElement("div");
-  root.id = "wplace_locator";
+  root.id = "wplace_versatile_tool";
   root.innerHTML = `
     <div id="wplace_header">
       <div class="drag-handle" style="display:flex;align-items:center;gap:8px;">
@@ -136,7 +136,7 @@
   } catch (e) {}
   (function installResizableRoot() {
   try {
-    const rootEl = document.getElementById('wplace_locator');
+    const rootEl = document.getElementById('wplace_versatile_tool');
     if (!rootEl) return;
 
     // 配置
@@ -333,7 +333,7 @@
   }
 })();
 
-  const styleId = "wplace_locator_css";
+  const styleId = "wplace_versatile_tool_css";
   if (!document.getElementById(styleId)) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
@@ -853,8 +853,8 @@ saveBtn.addEventListener('click', () => {
       // 忽略任何在地图样式 panel 或其按钮上的点击
       if (panel && panel.contains(target)) return;
       if (wrap && wrap.contains(target)) return;
-      // 忽略点击主面板（wplace_locator）及其子元素
-      const mainRoot = document.getElementById('wplace_locator');
+      // 忽略点击主面板（wplace_versatile_tool）及其子元素
+      const mainRoot = document.getElementById('wplace_versatile_tool');
       if (mainRoot && mainRoot.contains(target)) return;
       // 其余情况才关闭
       hidePanel();
@@ -1236,7 +1236,7 @@ try { ensureLocalVersionIsSet(); } catch(e) {}
 // fetch latest release from GitHub
 async function fetchLatestReleaseMain() {
   try {
-    const api = 'https://api.github.com/repos/lin-alg/Wplace_Locator/releases/latest';
+    const api = 'https://api.github.com/repos/lin-alg/Wplace_Versatile_Tool/releases/latest';
     const r = await fetch(api, { cache: 'no-store' });
     if (!r || !r.ok) throw new Error('gh fetch failed');
     const j = await r.json();
@@ -1305,8 +1305,8 @@ async function checkForUpdatesMain() {
     if (!localNorm && remoteNorm) {
       const msg = `${t('update_available')} ${normalizeForDisplay(remoteRaw || remoteNorm)}`;
       showMainToast(msg, 6000);
-      if (confirm(`${msg}\n\n${gh && gh.html_url ? gh.html_url : 'https://github.com/lin-alg/Wplace_Locator/releases'}\n\nOpen release page?`)) {
-        try { window.open((gh && gh.html_url) || 'https://github.com/lin-alg/Wplace_Locator/releases', '_blank'); } catch(_) {}
+      if (confirm(`${msg}\n\n${gh && gh.html_url ? gh.html_url : 'https://github.com/lin-alg/Wplace_Versatile_Tool/releases'}\n\nOpen release page?`)) {
+        try { window.open((gh && gh.html_url) || 'https://github.com/lin-alg/Wplace_Versatile_Tool/releases', '_blank'); } catch(_) {}
       }
       try { checkUpdateBtn.textContent = prev; checkUpdateBtn.disabled = false; } catch(e){}
       return;
@@ -1318,8 +1318,8 @@ async function checkForUpdatesMain() {
     } else if (cmp < 0) {
       const msg = `${t('update_available')} ${normalizeForDisplay(remoteRaw || remoteNorm)}`;
       showMainToast(msg, 6000);
-      if (confirm(`${msg}\n\n${gh && gh.html_url ? gh.html_url : 'https://github.com/lin-alg/Wplace_Locator/releases'}\n\nOpen release page?`)) {
-        try { window.open((gh && gh.html_url) || 'https://github.com/lin-alg/Wplace_Locator/releases', '_blank'); } catch(_) {}
+      if (confirm(`${msg}\n\n${gh && gh.html_url ? gh.html_url : 'https://github.com/lin-alg/Wplace_Versatile_Tool/releases'}\n\nOpen release page?`)) {
+        try { window.open((gh && gh.html_url) || 'https://github.com/lin-alg/Wplace_Versatile_Tool/releases', '_blank'); } catch(_) {}
       }
     } else {
       showMainToast(`${t('up_to_date')}: v${normalizeForDisplay(localRaw || localNorm)}`);
@@ -1826,7 +1826,7 @@ try {
 
     const floatBtn = document.createElement('button');
     floatBtn.id = 'wplace_min_icon_btn';
-    floatBtn.setAttribute('aria-label', 'Wplace Locator');
+    floatBtn.setAttribute('aria-label', 'Wplace Versatile Tool');
     Object.assign(floatBtn.style, {
       position: 'fixed',
       right: '16px',
@@ -3385,7 +3385,7 @@ document.addEventListener('click', (ev) => {
     if (!path || path.length === 0) {
       // fallback to target if composedPath not available
       if (!ev.target) return;
-      if (ev.target.closest && ev.target.closest('#wplace_locator')) return;
+      if (ev.target.closest && ev.target.closest('#wplace_versatile_tool')) return;
       if (!isMapElement(ev.target)) return;
       setTimeout(() => { try { requestFetchAndFill(); } catch(e){} }, 700);
       return;
@@ -3393,7 +3393,7 @@ document.addEventListener('click', (ev) => {
 
     // ignore clicks inside our UI
     for (const node of path) {
-      try { if (node && node.id === 'wplace_locator') return; } catch(e){}
+      try { if (node && node.id === 'wplace_versatile_tool') return; } catch(e){}
     }
 
     // debouncing
@@ -3642,8 +3642,8 @@ try { installShareAndFavHandlers(); } catch (e) { console.warn('installShareAndF
   window.__wplace_click_center_zoom_installed = true;
 
   const DEFAULT = {
-    deltaPerEvent: -300,
-    intervalMs: 100,
+    deltaPerEvent: -60,
+    intervalMs: 16,
     maxEvents: 5000,
     buttonSelector: 'button.btn.sm\\:btn-lg.duration.text-nowrap.text-xs.transition-opacity.sm\\:text-base',
     buttonTextMustContain: 'Zoom in to see the pixels',
@@ -3660,7 +3660,7 @@ try { installShareAndFavHandlers(); } catch (e) { console.warn('installShareAndF
     zoomKey: 'd',
     shrinkKey: 'a',
     // smooth single-shot
-    smoothDurationMs: 800,
+    smoothDurationMs: 400,
     zoomCount: 8,
     shrinkCount: 8,
     zoomDeltaPerEventMultiplier: 0.45,
@@ -3811,7 +3811,7 @@ try { installShareAndFavHandlers(); } catch (e) { console.warn('installShareAndF
   }
   function onMouseUp(e) {
     try {
-    if (e && e.target && e.target.closest && e.target.closest('#wplace_locator')) {
+    if (e && e.target && e.target.closest && e.target.closest('#wplace_versatile_tool')) {
       // 重置临时状态，避免残留 mouseDown 等
       state.mouseDownPos = null;
       state.mouseDownTime = 0;
@@ -4376,7 +4376,7 @@ try {
 } catch (e){}
 })();
 // 隐藏blue marble或是skirk marble
-(function installZToggleForBmDashDash() {
+(function installWToggleForBmDashDash() {
   try {
     if (window.__wplace_z_bm_dashdash_installed) return;
     window.__wplace_z_bm_dashdash_installed = true;
@@ -4651,7 +4651,7 @@ try {
     function toast(msg) { try { showToast && showToast(msg); } catch (_) { /* ignore */ } }
 
     // 取得主面板元素与浮动图标
-    const root = document.getElementById('wplace_locator');
+    const root = document.getElementById('wplace_versatile_tool');
     const floatBtn = document.getElementById('wplace_min_icon_btn') || window.__wplace_floatBtn;
 
     // 标记持久化 key
@@ -4663,7 +4663,7 @@ try {
     // 将面板设为最小化（关闭）：在 style 中加入 display:none 并写入 data 标记
     function hideMainPanelDirect() {
       try {
-        let el = document.getElementById('wplace_locator');
+        let el = document.getElementById('wplace_versatile_tool');
         if (!el) return false;
         // 保存原始样式到属性，便于恢复
         try {
@@ -4685,7 +4685,7 @@ try {
     // 恢复面板：移除 display:none 并恢复之前保存的样式（若有）
     function showMainPanelDirect() {
       try {
-        let el = document.getElementById('wplace_locator');
+        let el = document.getElementById('wplace_versatile_tool');
         if (!el) {
           // 如果没有主面板但有备份，尝试恢复备份（与原有恢复逻辑互补）
           try {
@@ -4783,136 +4783,12 @@ try {
   }
 })();
 
-// --------- 初始化优先读取掩码并在 5s 冷却期内忽略 console 驱动的变更 ----------
-(function installConsoleSyncWithStartupGuard() {
+(function ensureInjectBmMask() {
   try {
-    const STORAGE_KEY = 'bm_mask_v1';
-    const COOL_DOWN_MS = 5000;
-    let allowConsoleAt = Date.now() + COOL_DOWN_MS; // 冷却期内忽略 console 指令
-
-    // helpers from prior implementation (BigInt mask utils)
-    function readMask() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return 0n;
-        return BigInt(raw);
-      } catch (e) { return 0n; }
-    }
-    function writeMask(maskBigInt) {
-      try {
-        localStorage.setItem(STORAGE_KEY, maskBigInt.toString());
-        try { window.dispatchEvent(new CustomEvent('bm_mask_updated', { detail: { mask: maskBigInt.toString() } })); } catch(e){}
-      } catch (e) {}
-    }
-    function setBit(maskBigInt, index, val) {
-      const TOTAL_BITS = 64;
-      if (index < 0 || index >= TOTAL_BITS) return maskBigInt;
-      const bit = 1n << BigInt(index);
-      return val ? (maskBigInt | bit) : (maskBigInt & ~bit);
-    }
-
-    // apply stored mask to UI immediately (reuse existing binding function if present)
-    try {
-      // If you have a function syncUiFromMask() available in scope, call it; otherwise perform a best-effort apply
-      if (typeof syncUiFromMask === 'function') {
-        syncUiFromMask();
-      } else {
-        // best-effort: trigger an event so other code can react
-        const mask = readMask();
-        try { window.dispatchEvent(new CustomEvent('bm_mask_initial_apply', { detail: { mask: mask.toString() } })); } catch(e){}
-      }
-    } catch (e) {}
-
-    // After initial apply, ensure we wait COOL_DOWN_MS before accepting console-driven changes.
-    // Hijack console but do not apply changes if within cool-down window.
-    (function hijackConsole() {
-      try {
-        const orig = {
-          log: console.log && console.log.bind(console),
-          info: console.info && console.info.bind(console),
-          warn: console.warn && console.warn.bind(console),
-          error: console.error && console.error.bind(console)
-        };
-
-        function parserAndForward(fn, args) {
-          try {
-            // forward first (so logs still appear quickly)
-            try { fn(...args); } catch (e) {}
-
-            // don't process console-driven changes during cool-down
-            if (Date.now() < allowConsoleAt) return;
-
-            // join args to string for parsing
-            const raw = args.map(a => {
-              try { return (typeof a === 'string') ? a : JSON.stringify(a); } catch (e) { return String(a); }
-            }).join(' ');
-
-            const m = raw.match(/Blue\\s*Marble\\s*:\\s*(Enabled|Disabled)\\s*(\\d{1,3}\\s*,\\s*\\d{1,3}\\s*,\\s*\\d{1,3})/i);
-            if (!m) return;
-
-            const action = m[1].toLowerCase(); // 'enabled' or 'disabled'
-            const rgb = m[2].replace(/\\s/g, '');
-            // attempt to find corresponding index via a global COLORS array if present
-            let idx = null;
-            try {
-              if (window.__BM_COLOR_MAP && typeof window.__BM_COLOR_MAP === 'object') {
-                idx = window.__BM_COLOR_MAP[rgb] ?? null;
-              }
-            } catch (e) { idx = null; }
-
-            // if no global map, attempt best-effort to find by scanning DOM rows
-            if (idx === null) {
-              try {
-                const container = document.querySelector('#bm-g');
-                if (container) {
-                  const rows = Array.from(container.querySelectorAll('div')).filter(d => d.querySelector && d.querySelector('input[type="checkbox"]'));
-                  for (let i = 0; i < rows.length; i++) {
-                    try {
-                      const sw = rows[i].querySelector('div[style*="background"]') || rows[i].querySelector('div');
-                      const style = (sw && sw.getAttribute && sw.getAttribute('style')) || '';
-                      const mm = style.match(/rgb\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)/);
-                      if (mm) {
-                        const t = `${Number(mm[1])},${Number(mm[2])},${Number(mm[3])}`;
-                        if (t === rgb) { idx = i; break; }
-                      }
-                    } catch (e) { /* per-row ignore */ }
-                  }
-                }
-              } catch (e) {}
-            }
-
-            if (idx === null) return; // 无法定位到索引则放弃
-
-            // apply to mask and persist
-            try {
-              const mask = readMask();
-              const newMask = setBit(mask, idx, action.startsWith('en') ? 1 : 0);
-              writeMask(newMask);
-              // if syncUiFromMask exists, call to reflect change immediately
-              if (typeof syncUiFromMask === 'function') syncUiFromMask();
-              else {
-                // fallback: dispatch an event other code can listen to
-                try { window.dispatchEvent(new CustomEvent('bm_mask_changed_via_console', { detail: { idx, action, mask: newMask.toString() } })); } catch(e){}
-              }
-            } catch (e) {}
-          } catch (e) {
-            try { fn(...args); } catch (_) {}
-          }
-        }
-
-        console.log = function(...args){ parserAndForward(orig.log, args); };
-        console.info = function(...args){ parserAndForward(orig.info, args); };
-        console.warn = function(...args){ parserAndForward(orig.warn, args); };
-        console.error = function(...args){ parserAndForward(orig.error, args); };
-      } catch (e) {}
-    })();
-
-    // Expose a small API to override the cooldown (useful for testing)
-    try {
-      window.__bm_allowConsoleNow = function() { allowConsoleAt = Date.now(); };
-      window.__bm_setConsoleAllowDelay = function(ms) { allowConsoleAt = Date.now() + Number(ms || COOL_DOWN_MS); };
-    } catch (e) {}
-  } catch (err) {
-    console.warn('installConsoleSyncWithStartupGuard failed', err);
-  }
+    if (document.getElementById('__wplace_bm_mask_inject')) return;
+    const s = document.createElement('script');
+    s.id = '__wplace_bm_mask_inject';
+    s.src = chrome.runtime.getURL('wplace_bm_mask.js');
+    (document.head || document.documentElement || document.body).appendChild(s);
+  } catch (e) { console.warn('ensureInjectBmMask failed', e); }
 })();
