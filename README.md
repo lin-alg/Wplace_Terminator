@@ -1,7 +1,7 @@
 # Wplace_Versatile_Tool
 
-(此扩展如此有用，以至于值得您独立安装它。如果您愿意贡献篡改猴版本，我将万分感谢)
-(This extension is so useful that it's worth the time to install it. and I would be extremely grateful if you were willing to contribute a tamper monkey version.)
+(此浏览器扩展如此有用，以至于值得您独立安装它。我提供了一个只包含坐标跳转功能的篡改猴版本。如果您愿意贡献完整的篡改猴版本，我将万分感谢)
+(This browser extension is so useful that it's worth installing separately. I've provided a Tampermonkey version with only coordinate navigation functionality. I would be extremely grateful if you could contribute a complete Tampermonkey version.)
 
 选择语言 / Choose language  
 - [中文（简体）](#a-中文部分)  
@@ -106,7 +106,7 @@ Wplace多功能工具 是一个轻量的悬浮式扩展。它可以：
 Wplace Versatile Tool is a lightweight floating extension. It can:
 - Share coordinates: one-click share of base coordinates and location info  
 - Jump: paste coordinates someone shared to immediately jump to that position and automatically fill the base coordinates into the drawing plugin  
-- Save history of coordinates  
+- Favorites of coordinates  
 - Ruler: measure total pixels or width/height of an artwork so you no longer need to estimate manually
 - Snapshot: take a snapshot of the selected area, then you can use the snapshot as a template.
 - fix the bug that "blue marble" can not remember the colors you selected last time.
