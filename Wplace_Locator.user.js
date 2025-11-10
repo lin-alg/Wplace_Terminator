@@ -102,7 +102,218 @@
     <div class="resize-handle" aria-hidden="true"></div>
   `;
   document.body.appendChild(panel);
+  (function installBallMinimize() {
+  try {
+    const BALL_ID = 'wplace_net_ball';
+    const LSK_BALL_POS = 'wplace_net_ball_pos_v1';
 
+    // add top-right control container
+    const ctrl = document.createElement('div');
+    ctrl.style.position = 'absolute';
+    ctrl.style.right = '8px';
+    ctrl.style.top = '8px';
+    ctrl.style.display = 'flex';
+    ctrl.style.gap = '6px';
+    ctrl.style.alignItems = 'center';
+    ctrl.style.zIndex = '2147483648';
+    ctrl.style.pointerEvents = 'none'; // allow children to control events
+    panel.appendChild(ctrl);
+
+    // create minimize-to-ball button (icon-like)
+    const minBtn = document.createElement('button');
+    minBtn.setAttribute('aria-label', 'minimize to ball');
+    minBtn.title = t('minimized');
+    minBtn.className = 'wplace_btn ghost';
+    minBtn.style.pointerEvents = 'auto';
+    minBtn.style.padding = '6px';
+    minBtn.style.width = '34px';
+    minBtn.style.height = '28px';
+    minBtn.style.display = 'inline-flex';
+    minBtn.style.alignItems = 'center';
+    minBtn.style.justifyContent = 'center';
+    minBtn.style.borderRadius = '6px';
+    minBtn.style.fontSize = '12px';
+    minBtn.textContent = '—';
+    ctrl.appendChild(minBtn);
+
+    // create the ball element (hidden by default)
+    const ball = document.createElement('div');
+    ball.id = BALL_ID;
+    ball.style.position = 'fixed';
+    ball.style.width = '56px';
+    ball.style.height = '56px';
+    ball.style.borderRadius = '50%';
+    ball.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))';
+    ball.style.boxShadow = '0 8px 20px rgba(0,0,0,0.4)';
+    ball.style.color = '#e8e8e8';
+    ball.style.display = 'none';
+    ball.style.alignItems = 'center';
+    ball.style.justifyContent = 'center';
+    ball.style.zIndex = '2147483647';
+    ball.style.cursor = 'pointer';
+    ball.style.userSelect = 'none';
+    ball.style.fontWeight = '700';
+    ball.style.fontSize = '12px';
+    ball.style.backdropFilter = 'blur(4px)';
+    ball.textContent = 'W';
+    document.body.appendChild(ball);
+
+    // load ball pos if exists
+    function loadBallPos() {
+      try {
+        const raw = localStorage.getItem(LSK_BALL_POS);
+        if (!raw) return null;
+        const o = JSON.parse(raw);
+        if (typeof o.left === 'number' && typeof o.top === 'number') return o;
+      } catch (e) {}
+      return null;
+    }
+    function saveBallPos(left, top) {
+      try { localStorage.setItem(LSK_BALL_POS, JSON.stringify({ left: left, top: top })); } catch (e) {}
+    }
+
+    // show/hide helpers
+    function showBall(left, top) {
+      ball.style.left = (left !== undefined ? left : (window.innerWidth - 76)) + 'px';
+      ball.style.top = (top !== undefined ? top : (window.innerHeight - 96)) + 'px';
+      ball.style.display = 'flex';
+    }
+    function hideBall() {
+      ball.style.display = 'none';
+    }
+
+    // drag behavior for ball
+    (function makeBallDraggable() {
+      let dragging = false, pid = null, sx = 0, sy = 0, sl = 0, st = 0;
+      // reset drag flag
+      ball._wasDragged = false;
+
+      ball.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+        ev.preventDefault();
+        dragging = true;
+        pid = ev.pointerId;
+        ball.setPointerCapture && ball.setPointerCapture(pid);
+        sx = ev.clientX; sy = ev.clientY;
+        const r = ball.getBoundingClientRect();
+        sl = r.left; st = r.top;
+        ball._wasDragged = false;
+        document.body.style.userSelect = 'none';
+        window.addEventListener('pointermove', onMove, { passive: false });
+        window.addEventListener('pointerup', onUp, { passive: false });
+        window.addEventListener('pointercancel', onUp, { passive: false });
+      });
+
+      function onMove(ev) {
+        if (!dragging || ev.pointerId !== pid) return;
+        ev.preventDefault();
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        // consider small threshold to avoid tiny accidental moves
+        if (!ball._wasDragged && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) ball._wasDragged = true;
+        const margin = 8;
+        let L = Math.round(sl + dx), T = Math.round(st + dy);
+        L = Math.max(margin, Math.min(window.innerWidth - ball.offsetWidth - margin, L));
+        T = Math.max(margin, Math.min(window.innerHeight - ball.offsetHeight - margin, T));
+        ball.style.left = L + 'px';
+        ball.style.top = T + 'px';
+      }
+
+      function onUp(ev) {
+        if (!dragging || ev.pointerId !== pid) return;
+        dragging = false;
+        try { ball.releasePointerCapture && ball.releasePointerCapture(pid); } catch (_) {}
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        document.body.style.userSelect = '';
+        try {
+          const r = ball.getBoundingClientRect();
+          saveBallPos(Math.round(r.left), Math.round(r.top));
+        } catch (e) {}
+        // keep ball._wasDragged value for click handler to check
+        // clear the pointer capture id
+        pid = null;
+      }
+    })();
+
+    // when panel is minimized -> hide panel element, show ball
+    function minimizeToBall() {
+      try {
+        // hide panel
+        panel.classList.add('hidden');
+        try { localStorage.setItem(LSK_MIN, '1'); } catch (e) {}
+        // show ball at stored pos or near previous panel pos
+        const bp = loadBallPos();
+        if (bp) showBall(bp.left, bp.top);
+        else {
+          // if panel has a stored pos, try to place ball near panel
+          try {
+            const rect = panel.getBoundingClientRect();
+            const left = Math.min(window.innerWidth - 56 - 8, Math.max(8, rect.left + rect.width - 56));
+            const top = Math.min(window.innerHeight - 56 - 8, Math.max(8, rect.top));
+            showBall(left, top);
+            saveBallPos(left, top);
+          } catch (e) { showBall(); }
+        }
+        showToast(t('minimized'), 1200);
+      } catch (e) {}
+    }
+
+    // restore from ball -> hide ball, show panel and restore size/pos
+    function restoreFromBall() {
+      try {
+        hideBall();
+        panel.classList.remove('hidden');
+        try { localStorage.removeItem(LSK_MIN); } catch (e) {}
+        // attempt to restore panel clamp (size/position)
+        try { panel.__wplace_size_api && panel.__wplace_size_api.loadSizeAndPosition && panel.__wplace_size_api.loadSizeAndPosition(); } catch (e) {}
+        showToast(t('restored'), 1200);
+      } catch (e) {}
+    }
+
+    // button click -> minimize
+    minBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const isHidden = panel.classList.contains('hidden');
+      if (!isHidden) minimizeToBall();
+      else restoreFromBall();
+    });
+
+    // ball click -> restore
+    ball.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      // if a drag happened just before click, ignore this click
+      if (ball._wasDragged) {
+        // reset flag so next actual click works
+        ball._wasDragged = false;
+        return;
+      }
+      restoreFromBall();
+    });
+
+    // integrate with existing S-key toggle: when toggling to hidden state, prefer ball display
+    // replace applyMinimizedState usage by wrapping it: if requested min -> minimizeToBall; else restoreFromBall
+    // to avoid touching many call sites, monkey-patch applyMinimizedState if exists
+    try {
+      if (typeof applyMinimizedState === 'function') {
+        const original = applyMinimizedState;
+        applyMinimizedState = function(min) {
+          if (min) minimizeToBall();
+          else restoreFromBall();
+        };
+      }
+    } catch (e) {}
+
+    // when page loads and LSK_MIN indicates minimized, show ball
+    try {
+      const raw = localStorage.getItem(LSK_MIN);
+      if (raw === '1') {
+        // show ball after a tick so layout has settled
+        setTimeout(() => { minimizeToBall(); }, 60);
+      }
+    } catch (e) {}
+  } catch (e) { console.warn('ball install failed', e); }
+})();
   const shareBtn = panel.querySelector('#wplace_share_btn');
   const jumpBtn = panel.querySelector('#wplace_jump_btn');
   const moreBtn = panel.querySelector('#wplace_more_btn');
