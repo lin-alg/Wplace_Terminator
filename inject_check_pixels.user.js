@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Pixel Dropper Injected (Press C + Precise Offline Suppress) - Auto-read coords (bm-j) + bm-D support
-// @namespace    https://example.com/
+// @namespace    http://tampermonkey.net/
 // @version      1.9.3
 // @description  按 C 时模拟点击 paint 并在检测窗口内拦截上报。支持自动读取已存在的坐标输入（旧 id 与 bm-D 内的新 id），兼容多种 file input 包装形式，优化 observer debounce 与透明颜色处理。
 // @match        https://*.wplace.live/*
 // @run-at       document-start
-// @grant        GM_registerMenuCommand
+// @grant        GM_addStyle
 // ==/UserScript==
 
 (function () {
