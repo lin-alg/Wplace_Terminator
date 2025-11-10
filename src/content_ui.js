@@ -1,8 +1,151 @@
 // content_ui.js (完整替换文件)
 // 功能：浮动面板、稳定拖拽、最小化为可拖拽图标、智能检测并填充 Blue/Skirk 输入后跳转
 (() => {
-  if (window.__WPLACE_VERSATILE_TOOL_INJECTED) return;
-  window.__WPLACE_VERSATILE_TOOL_INJECTED = true;
+    if (window.__WPLACE_VERSATILE_TOOL_INJECTED) return;
+    window.__WPLACE_VERSATILE_TOOL_INJECTED = true;
+
+    (function promptOpenInjectCheckOnce() {
+    const KEY = 'wplace_prompted_inject_check_v1';
+    const CHECK_URL = 'https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/inject_check_pixels.user.js';
+
+    function markPrompted() {
+      try {
+        if (window.chrome && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ [KEY]: true }, () => {});
+        } else {
+          localStorage.setItem(KEY, '1');
+        }
+      } catch (e) {
+        try { localStorage.setItem(KEY, '1'); } catch (_) {}
+      }
+    }
+
+    function alreadyPrompted(cb) {
+      try {
+        if (window.chrome && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.get([KEY], (res) => {
+            try { cb(!!(res && res[KEY])); } catch (e) { cb(false); }
+          });
+          return;
+        }
+      } catch (e) {}
+      try {
+        const v = localStorage.getItem(KEY);
+        cb(!!v);
+      } catch (e) { cb(false); }
+    }
+
+    function createModal(message, onConfirm, onCancel) {
+      try {
+        // 若已有 modal，直接返回
+        if (document.getElementById('__wplace_inject_prompt')) return;
+        const wrap = document.createElement('div');
+        wrap.id = '__wplace_inject_prompt';
+        Object.assign(wrap.style, {
+          position: 'fixed',
+          left: '0',
+          top: '0',
+          width: '100vw',
+          height: '100vh',
+          zIndex: 2147483647,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.36)',
+          fontFamily: 'sans-serif'
+        });
+
+        const box = document.createElement('div');
+        Object.assign(box.style, {
+          width: '420px',
+          maxWidth: '92vw',
+          background: '#0b0b0b',
+          color: '#e8e8e8',
+          padding: '14px',
+          borderRadius: '10px',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        });
+
+        const title = document.createElement('div');
+        title.textContent = 'Wplace 检查脚本';
+        Object.assign(title.style, { fontWeight: 600, fontSize: '15px' });
+
+        const msg = document.createElement('div');
+        msg.textContent = message;
+        Object.assign(msg.style, { fontSize: '13px', opacity: 0.95, lineHeight: '1.4' });
+
+        const actions = document.createElement('div');
+        Object.assign(actions.style, { display: 'flex', justifyContent: 'flex-end', gap: '8px' });
+
+        const btnCancel = document.createElement('button');
+        btnCancel.textContent = '取消';
+        Object.assign(btnCancel.style, { padding: '6px 10px', borderRadius: '6px', background: 'transparent', color: '#cfcfcf', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' });
+
+        const btnOk = document.createElement('button');
+        btnOk.textContent = '打开';
+        Object.assign(btnOk.style, { padding: '6px 12px', borderRadius: '6px', background: '#0a84ff', color: '#fff', border: 'none', cursor: 'pointer' });
+
+        actions.appendChild(btnCancel);
+        actions.appendChild(btnOk);
+
+        box.appendChild(title);
+        box.appendChild(msg);
+        box.appendChild(actions);
+        wrap.appendChild(box);
+        (document.body || document.documentElement).appendChild(wrap);
+
+        function cleanup() {
+          try { wrap.remove(); } catch (e) {}
+        }
+
+        btnCancel.addEventListener('click', () => {
+          try { cleanup(); } catch (e) {}
+          try { onCancel && onCancel(); } catch (e) {}
+        }, { once: true });
+
+        btnOk.addEventListener('click', () => {
+          try { cleanup(); } catch (e) {}
+          try { onConfirm && onConfirm(); } catch (e) {}
+        }, { once: true });
+
+        // close on outside click
+        wrap.addEventListener('click', (ev) => {
+          if (ev.target === wrap) {
+            try { cleanup(); } catch (e) {}
+            try { onCancel && onCancel(); } catch (e) {}
+          }
+        });
+      } catch (e) {
+        try { onCancel && onCancel(); } catch (err) {}
+      }
+    }
+
+    try {
+      alreadyPrompted((did) => {
+        if (did) return;
+        // 延迟一点时间以免影响页面首屏渲染
+        setTimeout(() => {
+          createModal(
+            '此插件外带的篡改猴脚本可帮助检查绘画时画错的像素，是否安装？（需使用Skirk Marble）',
+            () => {
+              try {
+                // 标记已提示并打开链接
+                markPrompted();
+                const w = window.open(CHECK_URL, '_blank');
+                try { if (w) w.focus(); } catch (e) {}
+              } catch (e) {}
+            },
+            () => {
+              try { markPrompted(); } catch (e) {}
+            }
+          );
+        }, 800);
+      });
+    } catch (e) {}
+  })();
 
   const i18n = {
     en: {
