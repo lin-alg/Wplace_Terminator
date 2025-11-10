@@ -193,12 +193,15 @@
         (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)))
         || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
 
+      // Prevent browser touch gestures interfering with pointer events
+      try { ball.style.touchAction = 'none'; } catch (e) {}
+
       ball.addEventListener('pointerdown', (ev) => {
         if (ev.pointerType === 'mouse' && ev.button !== 0) return;
         ev.preventDefault();
         dragging = true;
         pid = ev.pointerId;
-        ball.setPointerCapture && ball.setPointerCapture(pid);
+        try { ball.setPointerCapture && ball.setPointerCapture(pid); } catch (e) {}
         sx = ev.clientX; sy = ev.clientY;
         const r = ball.getBoundingClientRect();
         sl = r.left; st = r.top;
@@ -211,10 +214,10 @@
 
       function onMove(ev) {
         if (!dragging || ev.pointerId !== pid) return;
-        ev.preventDefault();
+        // ensure default browser handling is prevented so pointer stays active
+        try { ev.preventDefault(); } catch (e) {}
         const dx = ev.clientX - sx, dy = ev.clientY - sy;
 
-        // on desktop: keep small-threshold and margin clamping (original behavior)
         if (!isMobile) {
           if (!ball._wasDragged && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) ball._wasDragged = true;
           const margin = 8;
@@ -226,8 +229,7 @@
           return;
         }
 
-        // on mobile: remove the "elastic" behavior — move directly with pointer (no small-threshold, no extra margin),
-        // but still keep element inside viewport (strict clamp to edges)
+        // Mobile: direct follow, strict clamp to viewport, avoid elastic behavior
         if (!ball._wasDragged) ball._wasDragged = true;
         let L = Math.round(sl + dx), T = Math.round(st + dy);
         const maxL = Math.max(0, window.innerWidth - ball.offsetWidth);
@@ -248,10 +250,8 @@
         document.body.style.userSelect = '';
         try {
           const r = ball.getBoundingClientRect();
-          // on mobile we saved the strict clamped position; on desktop it's the original clamped one
           saveBallPos(Math.round(r.left), Math.round(r.top));
         } catch (e) {}
-        // keep ball._wasDragged value for click handler to check
         pid = null;
       }
     })();
