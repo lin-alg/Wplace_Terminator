@@ -2929,7 +2929,7 @@ try {
       zIndex: 2147483647,
       width: '380px',
       maxWidth: '94vw',
-      height: '260px',
+      height: '280px',
       background: 'rgba(10,10,10,0.97)',
       color: '#e8e8e8',
       borderRadius: '10px',
@@ -3095,13 +3095,14 @@ try {
   const TILE_SIZE = 1000;               // 每个 tile 的像素宽高
   const BACKEND_TILE_URL = 'https://backend.wplace.live/files/s0/tiles'; // 模板前缀
   const FETCH_TIMEOUT_MS = 7000;        // 每个 tile fetch 超时
-  const MAX_CONCURRENT_FETCH = 6;       // 并发限制以防并发过高
+  const MAX_CONCURRENT_FETCH = 2;       // 并发限制以防并发过高
 
+  // 平滑提示封装（优先使用页面 showToast）
   function showRulerToast(msg, timeout = 2500) {
     try { showToast && showToast(msg, timeout); } catch (e) { console.log(msg); }
   }
 
-  // 计算全局像素坐标（X,Y）工具，复用你已有 computeXYFromFour 风格
+  // 计算全局像素坐标（X, Y）
   function fourToGlobalXY(arr) {
     if (!arr || arr.length !== 4) return null;
     const [TlX, TlY, PxX, PxY] = arr.map(Number);
@@ -3111,28 +3112,107 @@ try {
     return { X, Y };
   }
 
-  // 给 fetch 加超时
+  // fetch with timeout -> 返回 Blob 或 reject 错误
   function fetchWithTimeout(url, opts = {}, timeout = FETCH_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('timeout')), timeout);
-      fetch(url, Object.assign({ mode: 'cors', credentials: 'same-origin' }, opts))
-        .then(r => {
-          clearTimeout(timer);
-          if (!r.ok) throw new Error('http ' + r.status);
-          return r.blob();
-        })
-        .then(b => resolve(b))
-        .catch(err => { clearTimeout(timer); reject(err); });
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        try { controller.abort(); } catch (e) {}
+        reject(new Error('timeout'));
+      }, timeout);
+
+      const finalOpts = Object.assign({}, opts, { mode: 'cors', credentials: 'omit', signal: controller.signal });
+
+      fetch(url, finalOpts).then(res => {
+        clearTimeout(timer);
+        if (!res.ok) {
+          // 包含状态码在错误信息中，便于外层判断
+          reject(new Error('http ' + res.status));
+          return;
+        }
+        return res.blob();
+      }).then(b => {
+        clearTimeout(timer);
+        resolve(b);
+      }).catch(err => {
+        clearTimeout(timer);
+        reject(err);
+      });
     });
   }
 
-  // 根据 start/end 四元坐标生成截图并触发下载
+  // ---------------- TokenBucket RateLimiter （平滑速率） ----------------
+  // 令牌桶实现：以固定速率补充 token，acquire 获取 1 token（若没有则等待）
+  class TokenBucket {
+    constructor(ratePerSec, capacity) {
+      this.rate = Math.max(0.001, ratePerSec);
+      this.capacity = Math.max(1, capacity || Math.ceil(ratePerSec));
+      this.tokens = this.capacity; // 初始允许短时爆发
+      this.last = Date.now();
+      this.waiters = [];
+      this._timer = setInterval(() => this._replenish(), 200); // 每 200ms 补充一次
+    }
+
+    _replenish() {
+      const now = Date.now();
+      const elapsed = (now - this.last) / 1000.0;
+      if (elapsed <= 0) return;
+      this.last = now;
+      this.tokens = Math.min(this.capacity, this.tokens + elapsed * this.rate);
+      if (this.waiters.length && this.tokens >= 1) {
+        const allowed = Math.floor(this.tokens);
+        for (let i = 0; i < allowed && this.waiters.length; i++) {
+          const fn = this.waiters.shift();
+          try { fn(); } catch (e) {}
+        }
+      }
+    }
+
+    async acquire() {
+      this._replenish();
+      if (this.tokens >= 1 - 1e-9) {
+        this.tokens -= 1;
+        return;
+      }
+      await new Promise(resolve => {
+        this.waiters.push(() => {
+          this._replenish();
+          if (this.tokens >= 1 - 1e-9) {
+            this.tokens -= 1;
+            resolve();
+          } else {
+            setTimeout(() => {
+              this._replenish();
+              if (this.tokens >= 1 - 1e-9) { this.tokens -= 1; }
+              resolve();
+            }, 250);
+          }
+        });
+      });
+    }
+
+    stop() {
+      try { clearInterval(this._timer); } catch (e) {}
+      while (this.waiters.length) {
+        const fn = this.waiters.shift();
+        try { fn(); } catch (e) {}
+      }
+    }
+  }
+
+  // ---------------- 主逻辑：根据 start/end 抓取 tiles 并拼接 ----------------
   async function captureRulerSelectionAsPNG(startArr, endArr) {
-    if (!startArr || !endArr) { showRulerToast('需要先设置起点和终点 | Please set start and end points first'); return; }
+    if (!startArr || !endArr) {
+      showRulerToast('需要先设置起点和终点 | Please set start and end points first');
+      return;
+    }
 
     const a = fourToGlobalXY(startArr);
     const b = fourToGlobalXY(endArr);
-    if (!a || !b) { showRulerToast('坐标解析失败 | Coordinate parsing failed'); return; }
+    if (!a || !b) {
+      showRulerToast('坐标解析失败 | Coordinate parsing failed');
+      return;
+    }
 
     // 规范化为左上与右下（包含边界）
     const leftX = Math.min(a.X, b.X);
@@ -3142,15 +3222,23 @@ try {
 
     const outW = rightX - leftX + 1;
     const outH = bottomY - topY + 1;
-    if (outW <= 0 || outH <= 0) { showRulerToast('选区大小为零 | Selection size is zero'); return; }
+    if (outW <= 0 || outH <= 0) {
+      showRulerToast('选区大小为零 | Selection size is zero');
+      return;
+    }
 
-    // tile 范围（基于 TILE_SIZE）
+    // 防护：避免生成超大 canvas
+    const MAX_PIXELS = 32768 * 32768;
+    if (outW * outH > MAX_PIXELS) {
+      showRulerToast('输出过大，请缩小选区 | Selection too large');
+      return;
+    }
+
     const tileLeft = Math.floor(leftX / TILE_SIZE);
     const tileRight = Math.floor(rightX / TILE_SIZE);
     const tileTop = Math.floor(topY / TILE_SIZE);
     const tileBottom = Math.floor(bottomY / TILE_SIZE);
 
-    // 计算需要请求的所有 tile 列表
     const tiles = [];
     for (let ty = tileTop; ty <= tileBottom; ty++) {
       for (let tx = tileLeft; tx <= tileRight; tx++) {
@@ -3160,111 +3248,248 @@ try {
 
     showRulerToast(`开始抓取 ${tiles.length} 张 tile，可能需要一些时间... | Fetching ${tiles.length} tiles, this may take a while...`, 4000);
 
-    // 限流并行 fetch
+    // 并发受限且速率平滑的 fetchAllTiles
     async function fetchAllTiles(list) {
-      const results = new Map(); // key 'tx,ty' -> ImageBitmap (or HTMLImageElement)
-      let idx = 0;
+  const results = new Map();
+  let idx = 0;
 
-      async function worker() {
-        while (true) {
-          let item;
-          // get next
-          if (idx >= list.length) return;
-          item = list[idx++];
-          const url = `${BACKEND_TILE_URL}/${item.tx}/${item.ty}.png`;
-          try {
-            const blob = await fetchWithTimeout(url, {}, FETCH_TIMEOUT_MS);
-            // create ImageBitmap if supported (更快)，否则用 img element
-            let imgBitmap = null;
-            if (typeof createImageBitmap === 'function') {
-              try { imgBitmap = await createImageBitmap(blob); }
-              catch (e) { imgBitmap = null; }
-            }
-            if (!imgBitmap) {
-              // fallback to HTMLImageElement
-              const objectURL = URL.createObjectURL(blob);
-              const img = await new Promise((res, rej) => {
-                const el = new Image();
-                el.crossOrigin = 'anonymous';
-                el.onload = () => { URL.revokeObjectURL(objectURL); res(el); };
-                el.onerror = (ev) => { URL.revokeObjectURL(objectURL); rej(new Error('img load error')); };
-                el.src = objectURL;
-              });
-              results.set(`${item.tx},${item.ty}`, img);
-            } else {
-              results.set(`${item.tx},${item.ty}`, imgBitmap);
-            }
-          } catch (err) {
-            // store null to indicate missing tile
-            results.set(`${item.tx},${item.ty}`, null);
-            console.warn('tile fetch failed', url, err);
-          }
-        }
+  // TokenBucket 控制平均速率
+  const RATE = 2; // requests per second
+  const bucket = new TokenBucket(RATE, Math.ceil(RATE));
+
+  // 主队列与重试队列（重试不阻塞 worker）
+  const mainList = list.slice();
+  const retryQueue = [];
+
+  function getNext() {
+    if (idx < mainList.length) return mainList[idx++];
+    if (retryQueue.length) return retryQueue.shift();
+    return null;
+  }
+
+  // 进度统计
+  const stats = {
+    total: list.length,
+    done: 0,
+    failed: 0,
+    transparent: 0,
+    inFlight: 0,
+    lastToastTs: 0
+  };
+
+  // 定时器：每 500ms 更新一次 toast（防止过于频繁）
+  let progressTimer = null;
+  function startProgressTimer() {
+    if (progressTimer) return;
+    progressTimer = setInterval(() => {
+      const now = Date.now();
+      // 限频至少 400ms（额外保险）
+      if (now - stats.lastToastTs < 400) return;
+      stats.lastToastTs = now;
+      const msg = `抓取 tiles ${stats.done + stats.failed}/${stats.total}，正在进行中：${stats.inFlight} 个并发；失败 ${stats.failed}；透明 ${stats.transparent}`;
+      try { showRulerToast(msg, 2000); } catch (e) { console.log(msg); }
+    }, 500);
+  }
+  function stopProgressTimer() {
+    try { if (progressTimer) clearInterval(progressTimer); } catch (e) {}
+    progressTimer = null;
+  }
+
+  // 非阻塞地把 item 延迟加入 retryQueue（只重试一次）
+  function scheduleRetry(item, delayMs = 2000) {
+    item.__retryCount = (item.__retryCount || 0) + 1;
+    if (item.__retryCount > 1) {
+      // 超过重试次数就当作透明或失败
+      const key = `${item.tx},${item.ty}`;
+      results.set(key, { transparent: true });
+      stats.transparent++;
+      return;
+    }
+    setTimeout(() => {
+      retryQueue.push(item);
+    }, delayMs);
+  }
+
+  // 辅助：将解析 blob->image 的逻辑封装，任何异常都返回 null 或抛出
+  async function blobToImage(blob) {
+    if (!blob) return null;
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bmp = await createImageBitmap(blob);
+        return bmp;
+      } catch (e) {
+        // fallthrough to Image element
+      }
+    }
+    const objectURL = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise((res, rej) => {
+        const el = new Image();
+        el.crossOrigin = 'anonymous';
+        el.onload = () => { URL.revokeObjectURL(objectURL); res(el); };
+        el.onerror = () => { URL.revokeObjectURL(objectURL); rej(new Error('img load error')); };
+        el.src = objectURL;
+      });
+      return img;
+    } catch (e) {
+      try { URL.revokeObjectURL(objectURL); } catch (_) {}
+      throw e;
+    }
+  }
+
+  async function worker() {
+    while (true) {
+      const item = getNext();
+      if (!item) return;
+      const key = `${item.tx},${item.ty}`;
+      const url = `${BACKEND_TILE_URL}/${item.tx}/${item.ty}.png`;
+
+      // 在真正开始 fetch 之前统计 inFlight（用于更即时的并发提示）
+      stats.inFlight++;
+      let acquired = false;
+      try {
+        await bucket.acquire();
+        acquired = true;
+      } catch (e) {
+        // acquire 出错或已 stop，记录并继续
+        console.warn('rate acquire error or stopped', e);
+        results.set(key, null);
+        stats.failed++;
+        continue;
       }
 
-      // spawn workers
-      const workers = [];
-      const concurrency = Math.min(MAX_CONCURRENT_FETCH, Math.max(1, Math.floor(navigator.hardwareConcurrency || 4)));
-      for (let i = 0; i < concurrency; i++) workers.push(worker());
-      await Promise.all(workers);
-      return results;
+      try {
+        // 直接尝试抓取
+        let blob;
+        try {
+          blob = await fetchWithTimeout(url, {}, FETCH_TIMEOUT_MS);
+        } catch (firstErr) {
+          const errMsg = firstErr && firstErr.message ? String(firstErr.message) : '';
+          // 若是 429，则非阻塞重试一次（通过 scheduleRetry 回队列）
+          if (errMsg.indexOf('http 429') !== -1 || errMsg.indexOf('429') !== -1) {
+            // 不在此处 await sleep，改为将任务延迟放回 retryQueue
+            scheduleRetry(item, 2000);
+            continue;
+          } else if (errMsg.indexOf('http 404') !== -1) {
+            // 404 -> 透明 tile
+            results.set(key, { transparent: true });
+            stats.transparent++;
+            continue;
+          } else {
+            // 其他错误 -> 标记为失败
+            results.set(key, null);
+            stats.failed++;
+            console.warn('tile fetch failed', url, firstErr);
+            continue;
+          }
+        }
+
+        // 如果有 blob 则解析为 image
+        try {
+          const img = await blobToImage(blob);
+          if (!img) {
+            results.set(key, null);
+            stats.failed++;
+          } else {
+            results.set(key, img);
+            stats.done++;
+          }
+        } catch (imgErr) {
+          // 图片解析失败，标记为失败
+          console.warn('image parse failed', key, imgErr);
+          results.set(key, null);
+          stats.failed++;
+        }
+      } catch (err) {
+        const errMsg = err && err.message ? String(err.message) : '';
+        if (errMsg.indexOf('http 404') !== -1) {
+          results.set(key, { transparent: true });
+          stats.transparent++;
+        } else {
+          results.set(key, null);
+          stats.failed++;
+          console.warn('tile fetch failed', url, err);
+        }
+      } finally {
+        // 始终减少 inFlight，防止槽位被永久占用
+        stats.inFlight--;
+      }
     }
+  }
+
+  // 启动进度定时器
+  startProgressTimer();
+
+  const concurrency = Math.min(MAX_CONCURRENT_FETCH, Math.max(1, Math.floor(navigator.hardwareConcurrency || 4)));
+  const workers = [];
+  for (let i = 0; i < concurrency; i++) workers.push(worker());
+  await Promise.all(workers);
+
+  try { bucket.stop(); } catch (e) {}
+  // 停止并展示最终结果
+  stopProgressTimer();
+  try {
+    const finalMsg = `抓取完成：成功 ${stats.done} / ${stats.total}，失败 ${stats.failed}，透明 ${stats.transparent}`;
+    showRulerToast(finalMsg, 3500);
+  } catch (e) { /* ignore */ }
+
+  return results;
+}
 
     let fetchedMap;
     try {
       fetchedMap = await fetchAllTiles(tiles);
     } catch (e) {
-      showRulerToast('抓取 tiles 失败: ' + (e && e.message ? e.message : 'error') + ' | Fetching tiles failed: ' + (e && e.message ? e.message : 'error'), 4000);
+      showRulerToast('抓取 tiles 失败 | Fetching tiles failed', 4000);
       return;
     }
 
-    // 创建离屏 canvas（尺寸 outW x outH）
     const canvas = document.createElement('canvas');
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext('2d');
-    if (!ctx) { showRulerToast('无法获取 2D 上下文 | Unable to get 2D context'); return; }
+    if (!ctx) { showRulerToast('无法获取 2D context | Unable to get 2D context'); return; }
 
-    // 对每个 tile，计算在输出 canvas 的目标位置以及从 tile 内部要裁切的子区域
+    // 对每个 tile 做裁切并绘制到输出 canvas
     for (let ty = tileTop; ty <= tileBottom; ty++) {
       for (let tx = tileLeft; tx <= tileRight; tx++) {
         const key = `${tx},${ty}`;
         const tileImg = fetchedMap.get(key);
-        // tile 的全局像素范围
         const tileX0 = tx * TILE_SIZE;
         const tileY0 = ty * TILE_SIZE;
         const tileX1 = tileX0 + TILE_SIZE - 1;
         const tileY1 = tileY0 + TILE_SIZE - 1;
 
-        // 求交集（选区 vs tile）
         const sx = Math.max(leftX, tileX0);
         const ex = Math.min(rightX, tileX1);
         const sy = Math.max(topY, tileY0);
         const ey = Math.min(bottomY, tileY1);
         if (ex < sx || ey < sy) continue;
 
-        const srcX = sx - tileX0; // 在 tile 内的左上 x
-        const srcY = sy - tileY0; // 在 tile 内的左上 y
+        const srcX = sx - tileX0;
+        const srcY = sy - tileY0;
         const srcW = ex - sx + 1;
         const srcH = ey - sy + 1;
 
-        const destX = sx - leftX; // 在输出 canvas 上的位置
+        const destX = sx - leftX;
         const destY = sy - topY;
 
         try {
+          if (tileImg && tileImg.transparent) {
+            ctx.clearRect(Math.round(destX), Math.round(destY), Math.round(srcW), Math.round(srcH));
+            continue;
+          }
           if (!tileImg) {
-            // tile 丢失或获取失败 -> 用透明填充或占位（这里用半透明红提示缺图）
             ctx.fillStyle = 'rgba(255,0,0,0.25)';
             ctx.fillRect(destX, destY, srcW, srcH);
             ctx.fillStyle = 'rgba(0,0,0,0.0)';
             continue;
           }
-
-          // tileImg 可能是 ImageBitmap 或 HTMLImageElement
-          // drawImage 支持 ImageBitmap 与 HTMLImageElement
-          ctx.drawImage(tileImg,
-                        Math.round(srcX), Math.round(srcY), Math.round(srcW), Math.round(srcH),
-                        Math.round(destX), Math.round(destY), Math.round(srcW), Math.round(srcH));
+          ctx.drawImage(
+            tileImg,
+            Math.round(srcX), Math.round(srcY), Math.round(srcW), Math.round(srcH),
+            Math.round(destX), Math.round(destY), Math.round(srcW), Math.round(srcH)
+          );
         } catch (e) {
           console.warn('drawImage fail', key, e);
         }
@@ -3295,7 +3520,7 @@ try {
     }
   }
 
-  // 绑定到面板按钮（等待 panel 已创建）
+  // 绑定面板中的截图按钮（如果存在）
   function bindSnapshotButton() {
     try {
       const panelEl = document.getElementById('wplace_ruler_panel');
@@ -3307,7 +3532,6 @@ try {
       snapBtn.__wplace_snapshot_bound = true;
       snapBtn.addEventListener('click', async () => {
         try {
-          // 读取当前输入框的四元坐标（优先 panel 中的 input 文本）
           const sIn = panelEl.querySelector('#wplace_ruler_start');
           const eIn = panelEl.querySelector('#wplace_ruler_end');
           const sVal = sIn ? String(sIn.value || '').trim() : '';
@@ -3329,20 +3553,17 @@ try {
     }
   }
 
-  // 插入按钮并绑定（如果 panel 尚未创建，等待并观察）
+  // 如果面板已经存在则插入按钮并绑定；否则用 MutationObserver 观察创建后绑定
   (function ensureButtonExistsAndBind() {
     const panel = document.getElementById('wplace_ruler_panel');
     if (panel) {
-      // 如果按钮不存在，尝试在结果区域后追加
       try {
         if (!panel.querySelector('#wplace_ruler_snapshot')) {
           const footer = panel.querySelector('#wplace_ruler_body > div:last-of-type') || panel.querySelector('#wplace_ruler_body');
-          // create button and insert near clear
           const btn = document.createElement('button');
           btn.id = 'wplace_ruler_snapshot';
           btn.className = 'wplace_btn small';
           btn.textContent = '截图';
-          // try to place near clear button
           const clearBtn = panel.querySelector('#wplace_ruler_clear');
           if (clearBtn && clearBtn.parentElement) {
             clearBtn.parentElement.insertBefore(btn, clearBtn.nextSibling);
@@ -3353,12 +3574,10 @@ try {
           }
         }
       } catch (e) {}
-      // bind
       bindSnapshotButton();
       return;
     }
 
-    // 如果 panel 还没创建，则用 MutationObserver 等待创建后插入并绑定
     const mo = new MutationObserver((muts, obs) => {
       for (const m of muts) {
         if (m.addedNodes && m.addedNodes.length) {
@@ -3385,7 +3604,18 @@ try {
     try { mo.observe(document.body, { childList: true, subtree: true }); } catch (e) { /* ignore */ }
   })();
 
+  // 解析四元坐标字符串 -> [TlX, TlY, PxX, PxY]
+  function parseFourCoords(str) {
+    if (!str) return null;
+    const parts = String(str).trim().split(/[\s,;]+/).filter(Boolean);
+    if (parts.length !== 4) return null;
+    const nums = parts.map(Number);
+    if (nums.some(n => Number.isNaN(n))) return null;
+    return nums;
+  }
+
 })();
+
   function updateRulerI18n() {
   try {
     const m = document.getElementById('wplace_ruler_panel');
@@ -3943,8 +4173,8 @@ try { installShareAndFavHandlers(); } catch (e) { console.warn('installShareAndF
   window.__wplace_click_center_zoom_installed = true;
 
   const DEFAULT = {
-    deltaPerEvent: -60,
-    intervalMs: 16,
+    deltaPerEvent: -70,
+    intervalMs: 30,
     maxEvents: 5000,
     buttonSelector: 'button.btn.sm\\:btn-lg.duration.text-nowrap.text-xs.transition-opacity.sm\\:text-base',
     buttonTextMustContain: 'Zoom in to see the pixels',
@@ -5346,3 +5576,4 @@ try {
     console.warn('installWplaceFastPaintUsingShowToast failed', e);
   }
 })();
+
