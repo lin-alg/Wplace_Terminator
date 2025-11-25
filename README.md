@@ -1,12 +1,17 @@
 # Wplace_Versatile_Tool
 
-(此浏览器扩展十分实用，值得您安装它的独立插件版本。如果您无法使用电脑端的Chrome内核浏览器（谷歌/Edge等），我提供了一个只包含坐标跳转功能的篡改猴版本：[安装链接](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator.user.js) 。如果您愿意贡献完整的篡改猴版本，我将万分感谢)
+(Wplace终结者十分实用，值得您安装它的独立插件版本。如果您无法使用电脑端的Chrome内核浏览器（谷歌/Edge等），我提供了一个只包含坐标跳转功能的Wplace插件篡改猴版本：[安装链接](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator.user.js) 。如果您愿意贡献完整的篡改猴版本，我将万分感谢)
 
-## 支持本项目
+另外，本插件的2.0版本在火狐扩展商店能免费获取，名称：Wplace_Locator
 
-觉得此插件不错，想支持本项目？[查看赞助方式](Sponsor.md) 或点击仓库右上角的 **Sponsor** 按钮。
 
-(This browser extension is very useful and worth installing as a standalone plugin. If you cannot use a Chrome-based browser on your computer (Google Chrome/Edge, etc.), I have provided a Tampermonkey version with only coordinate navigation functionality: [Installation Link](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator.user.js). I would be extremely grateful if you could contribute a complete version.)
+(Wplace_terminator is very useful and worth installing as a standalone plugin. If you cannot use a Chrome-based browser on your computer (Google Chrome/Edge, etc.), I have provided a Tampermonkey version with only coordinate navigation functionality: [Installation Link](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator.user.js). I would be extremely grateful if you could contribute a complete version.)
+
+Firefox version(Free in extension store):"Wplace_Locator".
+
+## 支持本项目|Sponsor
+
+觉得此插件不错，想支持本项目？[查看赞助方式|Buy me a coffee](Sponsor.md) 或点击仓库右上角的 **Sponsor** 按钮。
 
 选择语言 / Choose language  
 - [中文（简体）](#a-中文部分)  
