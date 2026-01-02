@@ -1,6 +1,6 @@
 # Wplace_Versatile_Tool
 
-(Wplace终结者十分实用，值得您安装它的独立插件版本。如果您无法使用电脑端的Chrome内核浏览器（谷歌/Edge等），我提供了一个只包含坐标跳转功能的Wplace插件篡改猴版本：[安装链接](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator.user.js) 。如果您愿意贡献完整的篡改猴版本，我将万分感谢)
+(Wplace终结者十分实用，值得您安装它的独立插件版本。如果您无法使用电脑端的Chrome内核浏览器（谷歌/Edge等），我提供了一个只包含坐标跳转功能的Wplace插件篡改猴版本：[安装链接](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator-1.2.6.user.js) 。如果您愿意贡献完整的篡改猴版本，我将万分感谢)
 
 另外，本插件的2.0版本在火狐扩展商店能免费获取，名称：Wplace_Locator
 
