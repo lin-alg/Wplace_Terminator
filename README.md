@@ -5,7 +5,7 @@
 另外，本插件的2.0版本在火狐扩展商店能免费获取，名称：Wplace_Locator
 
 
-(Wplace_terminator is very useful and worth installing as a standalone plugin. If you cannot use a Chrome-based browser on your computer (Google Chrome/Edge, etc.), I have provided a Tampermonkey version with only coordinate navigation functionality: [Installation Link](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator.user.js). I would be extremely grateful if you could contribute a complete version.)
+(Wplace_terminator is very useful and worth installing as a standalone plugin. If you cannot use a Chrome-based browser on your computer (Google Chrome/Edge, etc.), I have provided a Tampermonkey version with only coordinate navigation functionality: [Installation Link](https://github.com/lin-alg/Wplace_Versatile_Tool/raw/refs/heads/main/Wplace_Locator-1.2.6.user.js). I would be extremely grateful if you could contribute a complete version.)
 
 Firefox version(Free in extension store):"Wplace_Locator".
 
