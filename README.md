@@ -98,7 +98,7 @@ Wplace多功能工具 是一个轻量的悬浮式扩展。它可以：
 
 ---
 
-## A. English section
+## B. English section
 
 ### Contents (click to jump)
 - [Overview](#overview)
